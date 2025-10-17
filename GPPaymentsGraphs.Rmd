@@ -1,7 +1,10 @@
-#########################################
-### GP dashboard deprivation analysis ###
-#########################################
+---
+title: "GPpaymentGraphs"
+output: word_document
+date: "2025-10-15"
+---
 
+```{r load-imd}
 library(tidyverse)
 library(readxl)
 
@@ -330,6 +333,11 @@ LSOA_imd_totals <- lsoa_imd %>%
     .groups = "drop"
   )
 
+```
+
+
+```{r load-imd}
+
 ### load workforce datasets
 
 temp_workforce = list.files(path = "data/workforce", pattern="\\.csv$", full.names = TRUE)
@@ -380,182 +388,156 @@ workforce_imd <- attribute_gps_to_lsoa %>%
 
 write.csv(workforce_imd, "workforce.csv")
 
-### QOF graphs
+```
 
-temp_qof = list.files(path = "data/qof", pattern="\\.csv$", full.names = TRUE)
 
-# extract only the csv file names into a list
 
-qof_datasets <-   lapply(
-  temp_qof, function(x) {
-    print(x)
-    
-    split_path = strsplit(x, "-")
-    path_year = split_path[[1]][[1]]
-    year = as.numeric(gsub(".*?([0-9]+).*", "\\1", path_year))
-    
-    qof_scores <- read.csv(x)
-    
-    if(year == 2017) {
-      
-      keep <- qof_scores[, c("Practice.code", "Achievement.score..max..559.")]
-      keep$Achievement.score..max..559. <- as.numeric(keep$Achievement.score..max..559.)
-      colnames(keep) <- c("PRACTICE_CODE", "TOTAL_POINTS")
-      keep$YEAR = as.numeric(year)
-      
-    } else if(year %in% c(2018:2019)) {
-      
-      keep <- qof_scores[, c("Practice.code", "Achievement.score..559.max.")]
-      keep$Achievement.score..559.max. <- as.numeric(keep$Achievement.score..559.max.)
-      colnames(keep) <- c("PRACTICE_CODE", "TOTAL_POINTS")
-      keep$YEAR = as.numeric(year)
-      
-    } else if(year %in% c(2021:2023)) {
-      
-      keep <- qof_scores[, c("Practice.code", "Achievement.score..635.max.")]
-      keep$Achievement.score..635.max. <- as.numeric(keep$Achievement.score..635.max.)
-      colnames(keep) <- c("PRACTICE_CODE", "TOTAL_POINTS")
-      keep$YEAR = as.numeric(year)
-      
-    }
-    return(keep)
-  }
-)
 
-qof_df <- as.data.frame(do.call(rbind, qof_datasets))
-
-qof_imd <- inner_join(qof_df, prac_imd, by=c("PRACTICE_CODE", "YEAR")) %>%
-  group_by(YEAR, IMD_QUINTILE) %>%
-  summarise(POINTS=mean(TOTAL_POINTS, na.rm=T)) %>%
-  mutate(
-    percentage = case_when(
-      YEAR %in% c(2017:2020) ~ round((POINTS/559)*100,2),
-      YEAR %in% c(2021:2023) ~ round((POINTS/635)*100,2)
-    )
-  )
-
-write.csv(qof_imd, "qof.csv")
+```{r load-imd}
 
 ## finance datasets
 #remove the 1 from the 19-20 dataset 
+temp_finance <- list.files(path = "data/payments", pattern="\\.csv$", full.names = TRUE)
 
-lapply(temp_finance, function(file) {
-  cat("File:", file, "\n")
-  cols <- names(read.csv(file, nrows = 1))  # read just the first row
-  print(cols)
-  cat("\n")
+finance_datasets <- lapply(temp_finance, function(x) {
+  message("Processing: ", x)
+  
+  # Extract year from filename
+  year <- as.numeric(gsub(".*?([0-9]{2,4}).*", "\\1", x))
+  if (year < 100) year <- 2000 + year  # Handle 2-digit years
+  
+  # Read CSV
+  finances <- read.csv(x, stringsAsFactors = FALSE)
+  names_lower <- tolower(names(finances))
+  
+  # Helper: safely extract column(s) if they exist
+  safe_extract <- function(pattern) {
+    idx <- grep(pattern, names_lower, ignore.case = TRUE)
+    if (length(idx) > 0) finances[, idx[1], drop = TRUE] else NA
+  }
+  
+  # Helper: safely convert numeric columns
+  to_numeric <- function(x) as.numeric(gsub(",", "", x))
+  
+  # Define all target columns with patterns
+  columns <- list(
+    PRACTICE_CODE = "practice.code",
+    CONTRACT_TYPE = "contract.type",
+    WEIGHTED_PATIENTS = "number.of.weighted.patients",
+    REGISTERED_PATIENTS = "number.of.registered.patients",
+    PAYMENTS_MINUS_DEDUCTIONS = "total.nhs.payments.to.general.practice.minus.deductions",
+    PAYMENTS = "total.nhs.payments.to.general.practice",
+    TOTAL_PAYMENTS = "total.nhs.payments.to.general.practice.including.covid.and.pcn.payments",
+    TOTAL_COVID_PAYMENTS = "total.covid.payments",
+    TOTAL_PCN_PAYMENTS = "total.pcn.payments",
+    PRESCRIBING_FEE = "prescribing.fee.payments",
+    DISPENSING_FEE = "dispensing.fee.payments",
+    REINBURSMENT_FEE = "reimbursement.of.drugs",
+    OTHER_PAYMENTS = "other.payments",
+    GLOBAL_SUM = "global.sum",
+    MPIG = "mpig.correction.factor",
+    IT = "information.management.and.technology",
+    PMS_BALANCE = "balance.of.pms.expenditure",
+    QOF_PAYMENT = "total.qof.payments",
+    CHILD_VACCINE = "childhood.vaccination.and.immunisation.scheme",
+    FLU_VACCINE = "influenza.and.pneumococcal.immunisations",
+    ROTAVIRUS_VACCINE = "rotavirus.and.shingles.immunisation",
+    PREMISES_PAYMENT = "premises.payments",
+    COVID_IMMUN = "covid.immunisation",
+    COVID_SUPPORT = "covid.support.and.expansion",
+    LONG_COVID = "long.covid",
+    ALCOHOL = "alcohol",
+    GP_EXTENDED = "gp.extended.hours.access",
+    FTDD = "facilitating.timely.diagnosis.and.support.for.people.with.dementia",
+    IPOA = "improving.patient.online.access",
+    LD = "learning.disabilities",
+    MS = "minor.surgery",
+    PP = "patient.participation",
+    RCM = "remote.care.monitoring",
+    RPCM = "risk.profiling.and.case.management",
+    SFVP = "services.for.violent.patients",
+    UA = "unplanned.admissions",
+    TNES = "total.national.enhanced.services",
+    TLES = "total.local.enhanced.services",
+    NDES = "non.des.item.pneumococcal.vaccine",
+    OOAIHUC = "out.of.area.in.hours.urgent.care",
+    Meningitis = "meningitis",
+    Pertussis = "pertussis",
+    TLIS = "total.local.incentive.schemes",
+    LIS = "local.incentive.schemes",
+    WMS = "weight.management.service",
+    MAR = "medical.assessment.reviews",
+    Seniority = "seniority",
+    DRSP = "doctors.retainer.scheme.payments",
+    TLA = "total.locum.allowances",
+    AC = "appraisal.costs",
+    PCO = "pco.admin.other",
+    GPFV = "general.practice.forward.view",
+    GPT = "general.practice.transformation",
+    WAF = "winter.access.fund",
+    PSL = "prolonged.study.leave",
+    AACIRL = "appraisal.*appraiser.costs.in.respect.of.locums",
+    PCNP = "pcn.participation",
+    PCNL = "pcn.leadership",
+    PCNS = "pcn.support",
+    PCNEHA = "pcn.extended.hours.access",
+    PCNW = "pcn.workforce",
+    PCNIIF = "pcn.investment.and.impact.fund",
+    PCNCHP = "pcn.care.home.premium",
+    PCNEA = "pcn.enhanced.access"
+  )
+  
+  # Extract and combine into one data frame
+  extracted <- lapply(columns, safe_extract)
+  df <- as.data.frame(extracted, stringsAsFactors = FALSE)
+  
+  # Add year
+  df$YEAR <- year
+  
+  # Convert numeric-like fields
+  num_cols <- setdiff(names(df), c("PRACTICE_CODE", "CONTRACT_TYPE", "YEAR"))
+  df[num_cols] <- lapply(df[num_cols], function(x) suppressWarnings(to_numeric(x)))
+  
+  return(df)
 })
 
-temp_finance = list.files(path = "data/payments", pattern="\\.csv$", full.names = TRUE)
-
-finance_datasets <-   lapply(
-  temp_finance, function(x) {
-    print(x)
-    
-    year <- as.numeric(gsub(".*?([0-9]+).*", "\\1", x))
-    
-    finances <- read.csv(x)
-    
-    PRACTICE_CODE <- finances[, "Practice.Code"]
-    CONTRACT_TYPE <- finances[, "Contract.Type"]
-    WEIGHTED_PATIENTS  <- finances[, grep("number.of.weighted.patients", tolower(names(finances)))]
-    REGISTERED_PATIENTS  <- finances[, grep("number.of.registered.patients", tolower(names(finances)))]
-    PAYMENTS <- finances[, grep("Total.NHS.Payments.to.General.Practice.Minus.Deductions", names(finances))]
-    PRESCRIBING_FEE <- finances[, grep("Prescribing.Fee.Payments", names(finances))]
-    DISPENSING_FEE <- finances[, grep("Dispensing.Fee.Payments", names(finances))]
-    REINBURSMENT_FEE <- finances[, grep("Reimbursement.of.Drugs", names(finances))]
-    OTHER_PAYMENTS <- finances[, grep("Other.Payments", names(finances))]
-    GLOBAL_SUM <- finances[, grep("Global.Sum", names(finances))]
-    MPIG <- finances[, grep("MPIG.Correction.factor", names(finances))]
-    IT <- finances[, grep("Information.Management.and.Technology", names(finances))]
-    PMS_BALANCE <- finances[, grep("Balance.of.PMS.Expenditure", names(finances))]
-    QOF_PAYMENT <- finances[, grep("Total.QOF.Payments", names(finances))]
-    CHILD_VACCINE <- finances[, grep("Childhood.Vaccination.and.Immunisation.Scheme", names(finances))]
-    FLU_VACCINE <- finances[, grep("Influenza.and.Pneumococcal.Immunisations", names(finances))]
-    ROTAVIRUS_VACCINE <- finances[, grep("Rotavirus.and.Shingles.Immunisation", names(finances))]
-    PREMISES_PAYMENT <- finances[, grep("Premises.Payments", names(finances))]
-    COVID_IMMUN <- finances[, grep("Covid.Immunisation", names(finances))]
-    COVID_SUPPORT <- finances[, grep("Covid.Support.and.Expansion", names(finances))]
-    LONG_COVID <- finances[, grep("Long.Covid", names(finances))]
-     ALCOHOL <- finances[, grep("Alcohol", names(finances))]
-     GP_EXTENDED <- finances[, grep("GP.Extended.Hours.Access", names(finances))]
-     FTDD <- finances[, grep("Facilitating.Timely.Diagnosis.and.Support.for.People.with.Dementia", names(finances))]
-     IPOA <- finances[, grep("Improving.Patient.Online.Access", names(finances))]
-     LD <- finances[, grep("Learning.Disabilities", names(finances))]
-     MS <- finances[, grep("Minor.Surgery", names(finances))]
-     PP <- finances[, grep("Patient.Participation", names(finances))]
-     RCM <- finances[, grep("Remote.Care.Monitoring", names(finances))]
-     RPCM <- finances[, grep("Risk.Profiling.and.Case.Management", names(finances))]
-     SFVP <- finances[, grep("Services.for.Violent.Patients", names(finances))]
-     UA <- finances[, grep("Unplanned.Admissions", names(finances))]
-     TNES <- finances[, grep("Total.National.Enhanced.Services", names(finances))]
-     TLES <- finances[, grep("Total.Local.Enhanced.Services", names(finances))]
-     NDES <- finances[, grep("Non.DES.Item.Pneumococcal.Vaccine..Childhood.Immunisation.Main.Programme", names(finances))]
-     OOAIHUC <- finances[, grep("Out.Of.Area.in.Hours.Urgent.Care", names(finances))]
-     Meningitis <- finances[, grep("Meningitis", names(finances))]
-     Pertussis <- finances[, grep("Pertussis", names(finances))]
-     TLIS <- finances[, grep("Total.Local.Incentive.Schemes", names(finances))]
-     LIS <- finances[, grep("Local.Incentive.Schemes", names(finances))]
-     WMS <- finances[, grep("Weight.Management.Service", names(finances))]
-     MAR <- finances[, grep("Medical.Assessment.Reviews", names(finances))]
-     MAR <- finances[, grep("Medical.Assessment.Reviews", names(finances))]
-     Seniority <- finances[, grep("Seniority", names(finances))]
-     DRSP <- finances[, grep("Doctors.Retainer.Scheme.Payments", names(finances))]
-     TLA <- finances[, grep("Total.Locum.Allowances", names(finances))]
-     AC <- finances[, grep("Appraisal.Costs", names(finances))]
-     PCO <- finances[, grep("PCO.Admin.Other", names(finances))]
-     GPFV <- finances[, grep("General.Practice.Forward.View", names(finances))]
-     GPT <- finances[, grep("General.Practice.Transformation", names(finances))]
-     WAF <- finances[, grep("winter.Access.Fund", names(finances))]
-     PSL <- finances[, grep("Prolonged.Study.Leave", names(finances))]
-     AACIRL <- finances[, grep("Appraisal...Appraiser.Costs.in.Respect.of.Locums", names(finances))]
-     PCNP <- finances[, grep("PCN.Participation", names(finances))]
-     PCNL <- finances[, grep("PCN.Leadership", names(finances))]
-     PCNS <- finances[, grep("PCN.Support", names(finances))]
-     PCNEHA <- finances[, grep("PCN.Extended.Hours.Access", names(finances))]
-     PCNW <- finances[, grep("PCN.Workforce", names(finances))]
-     PCNIIF <- finances[, grep("PCN.Investment.and.impact.Fund", names(finances))]
-     PCNCHP <- finances[, grep("PCN.Care.Home.Premium", names(finances))]
-     PCNEA <- finances[, grep("PCN.Enhanced.Access", names(finances))]
-     
-    print(length(PAYMENTS))
-    
-    to_numeric <- function(x) as.numeric(gsub(",", "", x))
-    
-   # WEIGHTED_PATIENTS <- to_numeric(WEIGHTED_PATIENTS)
-    REGISTERED_PATIENTS <- to_numeric(REGISTERED_PATIENTS)
-    #PAYMENTS <- to_numeric(PAYMENTS)
-    
-    # --- Replace NAs with 0 ---
-    REGISTERED_PATIENTS[is.na(REGISTERED_PATIENTS)] <- 0
-    
-    if(length(PAYMENTS) < 10) {
-      PAYMENTS <- finances[, "Total.NHS.Payments.to.General.Practice.Minus.Deductions"]
-    }
-    
-    YEAR <- 2000+year
-    print(YEAR)
-    
-    keep <- as.data.frame(cbind(PRACTICE_CODE, CONTRACT_TYPE, WEIGHTED_PATIENTS, REGISTERED_PATIENTS, PAYMENTS, PRESCRIBING_FEE, DISPENSING_FEE, REINBURSMENT_FEE, OTHER_PAYMENTS, GLOBAL_SUM, MPIG, IT, PMS_BALANCE, QOF_PAYMENT, CHILD_VACCINE, FLU_VACCINE, ROTAVIRUS_VACCINE, PREMISES_PAYMENT, COVID_IMMUN, COVID_SUPPORT, LONG_COVID, ALCOHOL, GP_EXTENDED, FTDD, IPOA, LD, MS, PP, RCM, RPCM, SFVP, UA, TNES, TLES, NDES, OOAIHUC, Meningitis, Pertussis, TLIS, LIS, WMS, MAR, Seniority, DRSP, TLA, AC, PCO, GPFV, GPT, WAF, PSL, AACIRL, PCNP, PCNL, PCNS, PCNEHA, PCNW, PCNIIF, PCNCHP, PCNEA
-))
-    keep$YEAR <- YEAR
-    
-    return(keep)
-  }
-)
-
+# Combine all years
 finances_df <- bind_rows(finance_datasets)
 
+finance_imd_TEST <- finances_df %>%
+  left_join(prac_imd, by = c("YEAR", "PRACTICE_CODE")) 
+
+#To see how many NA's there are by year
+test <- finance_imd_TEST %>%
+  group_by(YEAR) %>%
+  summarise(
+    NAs = sum(is.na(IMD_QUINTILE)),
+    non_NAs = sum(!is.na(IMD_QUINTILE))
+  )
+
+test_IMD <- finance_imd_TEST %>%
+  group_by(YEAR, IMD_QUINTILE) %>%
+  summarise(
+    non_NAs = sum(!is.na(IMD_QUINTILE))
+  )
+```
+
+
+
+```{r load-imd}
 finance_imd <- finances_df %>%
-  mutate(YEAR = as.numeric(YEAR),
-         WEIGHTED_PATIENTS = as.numeric(WEIGHTED_PATIENTS),
-         PAYMENTS = as.numeric(PAYMENTS)) %>%
-  left_join(prac_imd, by=c("YEAR", "PRACTICE_CODE")) %>%
+  left_join(prac_imd, by = c("YEAR", "PRACTICE_CODE")) %>%
   mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
   group_by(IMD_QUINTILE, YEAR) %>%
-  summarise(TOTAL_PAYMENTS = sum(PAYMENTS, na.rm=T),
-            TOTAL_WEIGHTED = sum(WEIGHTED_PATIENTS, na.rm=T)) %>%
-  mutate(PAYMENT_PER_WEIGHTED_PATIENT = TOTAL_PAYMENTS/TOTAL_WEIGHTED) %>%
+  summarise(
+    TOTAL_PAYMENTS = sum(
+      PAYMENTS,
+      na.rm = TRUE
+    ),
+    TOTAL_WEIGHTED = sum(WEIGHTED_PATIENTS, na.rm = TRUE),
+    NUM_PRACTICES = n_distinct(PRACTICE_CODE)
+  ) %>%
+  mutate(PAYMENT_PER_WEIGHTED_PATIENT = TOTAL_PAYMENTS / TOTAL_WEIGHTED) %>%
   na.omit()
 
 finance_imd_registered <- finances_df %>%
@@ -668,8 +650,6 @@ Total_Payments_GMS <- finances_df %>%
     names_to = "Variable",
     values_to = "Value"
   )
-
-
 
 Total_Payments <- finances_df %>%
   mutate(
@@ -798,18 +778,16 @@ finance_ADJ <- finance_ADJ %>%
 
 finance_imd_PaymentType <- Total_Payments %>%
   group_by(IMD_QUINTILE, YEAR) %>%
-  summarise(TOTAL_PAYMENTS = sum(PAYMENTS, na.rm=T),
-            TOTAL_WEIGHTED = sum(WEIGHTED_PATIENTS, na.rm=T)) %>%
-  mutate(PAYMENT_PER_WEIGHTED_PATIENT = TOTAL_PAYMENTS/TOTAL_WEIGHTED) %>%
+ # summarise(TOTAL_PAYMENTS = sum(PAYMENTS, na.rm=T),
+ #           TOTAL_WEIGHTED = sum(WEIGHTED_PATIENTS, na.rm=T)) %>%
+ # mutate(PAYMENT_PER_WEIGHTED_PATIENT = TOTAL_PAYMENTS/TOTAL_WEIGHTED) %>%
   na.omit()
 
 Payments_per_weighted_patient <- Total_Payments_GMS %>%
   group_by(IMD_QUINTILE, YEAR) %>%
-  # Get the total weighted patients for each group
   mutate(
     TOTAL_WEIGHTED = Value[Variable == "TOTAL_WEIGHTED"]
   ) %>%
-  # Calculate payment per weighted patient for all other variables
   filter(Variable != "TOTAL_WEIGHTED", Variable != "TOTAL_REGISTERED") %>%
   mutate(
     PAYMENT_PER_WEIGHTED = Value / TOTAL_WEIGHTED
@@ -831,146 +809,9 @@ Payments_per_registered_patient <- Total_Payments_GMS %>%
   ungroup() %>%
   select(IMD_QUINTILE, YEAR, Variable, PAYMENT_PER_REGISTERED)
 
-write.csv(final_df, "ADJpayments.csv")
+```
 
-write.csv(Total_Payments, "TotalPayment.csv")
-
-write.csv(finance_imd, "finance.csv")
-write.csv(finance_imd_registered, "finance_registered.csv")
-
-write.csv(Payments_per_weighted_patient, "PaymentsPerWeightedPatient.csv")
-write.csv(Payments_per_registered_patient, "PaymentsPerRegisteredPatient.csv")
-
-
-# ---- Combine all years ----
-nhs_payments <- bind_rows(finance_datasets)
-
-# ---- Summarise by category and year ----
-summary_df <- nhs_payments %>%
-  left_join(prac_imd, by = c("Practice.Code" = "PRACTICE_CODE", "Year" = "YEAR")) %>%
-  mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
-  group_by(IMD_QUINTILE, Year) %>%
-  summarise(
-    `Global Sum` = sum(Total.Global.Sum, na.rm = TRUE),
-    `IT & Premises` = sum(Total.IT.Premises, na.rm = TRUE),
-    `PCO Payments` = sum(Total.PCO, na.rm = TRUE),
-    `Contracted Services` = sum(Total.Contracted.Services, na.rm = TRUE),
-    `Prescribing` = sum(Total.Prescribing, na.rm = TRUE),
-    `COVID-19` = sum(Total.COVID, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  pivot_longer(
-    cols = c(`Global Sum`, `IT & Premises`, `PCO Payments`, `Contracted Services`, `Prescribing`, `COVID-19`),
-    names_to = "Payment Category",
-    values_to = "Total (£)"
-  ) %>%
-  mutate(`Total (£)` = label_comma()(round(`Total (£)`)))
-
-write.csv(summary_df, "summary_df.csv")
-
-temp_finance <- list.files(path = "data/payments", pattern="\\.csv$", full.names = TRUE)
-
-finance_datasets <- lapply(temp_finance, function(x) {
-  message("Processing: ", x)
-  
-  # Extract year from filename
-  year <- as.numeric(gsub(".*?([0-9]{2,4}).*", "\\1", x))
-  if (year < 100) year <- 2000 + year  # Handle 2-digit years
-  
-  # Read CSV
-  finances <- read.csv(x, stringsAsFactors = FALSE)
-  names_lower <- tolower(names(finances))
-  
-  # Helper: safely extract column(s) if they exist
-  safe_extract <- function(pattern) {
-    idx <- grep(pattern, names_lower, ignore.case = TRUE)
-    if (length(idx) > 0) finances[, idx[1], drop = TRUE] else NA
-  }
-  
-  # Helper: safely convert numeric columns
-  to_numeric <- function(x) as.numeric(gsub(",", "", x))
-  
-  # Define all target columns with patterns
-  columns <- list(
-    PRACTICE_CODE = "practice.code",
-    CONTRACT_TYPE = "contract.type",
-    WEIGHTED_PATIENTS = "number.of.weighted.patients",
-    REGISTERED_PATIENTS = "number.of.registered.patients",
-    PAYMENTS = "total.nhs.payments.to.general.practice.minus.deductions",
-    PRESCRIBING_FEE = "prescribing.fee.payments",
-    DISPENSING_FEE = "dispensing.fee.payments",
-    REINBURSMENT_FEE = "reimbursement.of.drugs",
-    OTHER_PAYMENTS = "other.payments",
-    GLOBAL_SUM = "global.sum",
-    MPIG = "mpig.correction.factor",
-    IT = "information.management.and.technology",
-    PMS_BALANCE = "balance.of.pms.expenditure",
-    QOF_PAYMENT = "total.qof.payments",
-    CHILD_VACCINE = "childhood.vaccination.and.immunisation.scheme",
-    FLU_VACCINE = "influenza.and.pneumococcal.immunisations",
-    ROTAVIRUS_VACCINE = "rotavirus.and.shingles.immunisation",
-    PREMISES_PAYMENT = "premises.payments",
-    COVID_IMMUN = "covid.immunisation",
-    COVID_SUPPORT = "covid.support.and.expansion",
-    LONG_COVID = "long.covid",
-    ALCOHOL = "alcohol",
-    GP_EXTENDED = "gp.extended.hours.access",
-    FTDD = "facilitating.timely.diagnosis.and.support.for.people.with.dementia",
-    IPOA = "improving.patient.online.access",
-    LD = "learning.disabilities",
-    MS = "minor.surgery",
-    PP = "patient.participation",
-    RCM = "remote.care.monitoring",
-    RPCM = "risk.profiling.and.case.management",
-    SFVP = "services.for.violent.patients",
-    UA = "unplanned.admissions",
-    TNES = "total.national.enhanced.services",
-    TLES = "total.local.enhanced.services",
-    NDES = "non.des.item.pneumococcal.vaccine",
-    OOAIHUC = "out.of.area.in.hours.urgent.care",
-    Meningitis = "meningitis",
-    Pertussis = "pertussis",
-    TLIS = "total.local.incentive.schemes",
-    LIS = "local.incentive.schemes",
-    WMS = "weight.management.service",
-    MAR = "medical.assessment.reviews",
-    Seniority = "seniority",
-    DRSP = "doctors.retainer.scheme.payments",
-    TLA = "total.locum.allowances",
-    AC = "appraisal.costs",
-    PCO = "pco.admin.other",
-    GPFV = "general.practice.forward.view",
-    GPT = "general.practice.transformation",
-    WAF = "winter.access.fund",
-    PSL = "prolonged.study.leave",
-    AACIRL = "appraisal.*appraiser.costs.in.respect.of.locums",
-    PCNP = "pcn.participation",
-    PCNL = "pcn.leadership",
-    PCNS = "pcn.support",
-    PCNEHA = "pcn.extended.hours.access",
-    PCNW = "pcn.workforce",
-    PCNIIF = "pcn.investment.and.impact.fund",
-    PCNCHP = "pcn.care.home.premium",
-    PCNEA = "pcn.enhanced.access"
-  )
-  
-  # Extract and combine into one data frame
-  extracted <- lapply(columns, safe_extract)
-  df <- as.data.frame(extracted, stringsAsFactors = FALSE)
-  
-  # Add year
-  df$YEAR <- year
-  
-  # Convert numeric-like fields
-  num_cols <- setdiff(names(df), c("PRACTICE_CODE", "CONTRACT_TYPE", "YEAR"))
-  df[num_cols] <- lapply(df[num_cols], function(x) suppressWarnings(to_numeric(x)))
-  
-  return(df)
-})
-
-# Combine all years
-finances_df <- bind_rows(finance_datasets)
-
+```{r myplot, fig.width=10, fig.height=6}
 
 ggplot(finance_imd, aes(
   x = YEAR,
@@ -1042,7 +883,6 @@ plot_data_2023 <- Total_Payments %>%
     !Variable %in% c("TOTAL_WEIGHTED", "TOTAL_REGISTERED")
   )
 
-# Create stacked bar chart
 ggplot(plot_data_2023, aes(
   x = as.factor(IMD_QUINTILE),
   y = Value,
@@ -1070,7 +910,6 @@ plot_data_2023_weighted <- Payments_per_weighted_patient %>%
     !Variable %in% c("TOTAL_WEIGHTED", "TOTAL_REGISTERED")
   )
 
-# Create stacked bar chart
 ggplot(plot_data_2023_weighted, aes(
   x = as.factor(IMD_QUINTILE),
   y = PAYMENT_PER_WEIGHTED,
@@ -1098,7 +937,6 @@ plot_data_2023_registered <- Payments_per_registered_patient %>%
     !Variable %in% c("TOTAL_WEIGHTED", "TOTAL_REGISTERED")
   )
 
-# Create stacked bar chart
 ggplot(plot_data_2023_registered, aes(
   x = as.factor(IMD_QUINTILE),
   y = PAYMENT_PER_REGISTERED,
@@ -1119,3 +957,4 @@ ggplot(plot_data_2023_registered, aes(
     plot.title = element_text(face = "bold", size = 16)
   )
 
+```
