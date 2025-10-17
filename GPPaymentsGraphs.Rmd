@@ -518,7 +518,8 @@ test <- finance_imd_TEST %>%
 test_IMD <- finance_imd_TEST %>%
   group_by(YEAR, IMD_QUINTILE) %>%
   summarise(
-    non_NAs = sum(!is.na(IMD_QUINTILE))
+    non_NAs = sum(!is.na(IMD_QUINTILE)),
+    n_NA = sum(is.na(IMD_QUINTILE))
   )
 ```
 
