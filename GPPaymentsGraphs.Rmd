@@ -656,7 +656,7 @@ finance_imd_ADJ <- finances_df %>%
 #create a uniform payment category column
 finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
   mutate(
-    PayCat_base = str_trim(
+    Payment_Category = str_trim(
       str_remove(`Payment Category`,
                  regex("\\((Registered|Weighted|ADJ)\\)$", ignore_case = TRUE))
     )
@@ -685,12 +685,12 @@ ordered_levels_sum <- c(
 
 Total_Finance_Categories <- finances_IMD_TOTAL %>%
   mutate(
-    PayCat_base = factor(PayCat_base, levels = ordered_levels_sum)
+    Payment_Category = factor(Payment_Category, levels = ordered_levels_sum)
   )
 
 Avg_Finance_Categories <- finances_IMD_TOTAL %>%
   mutate(
-    PayCat_base = factor(PayCat_base, levels = ordered_levels_avg)
+    Payment_Category = factor(Payment_Category, levels = ordered_levels_avg)
   )
 
 Weighted_By_Year <- ggplot(finance_imd_weighted, aes(
@@ -778,12 +778,12 @@ Total_Finance_Categories <- Total_Finance_Categories %>%
   group_by(`Payment Category`) %>%
   mutate(total_cat = sum(`Total (£)`, na.rm = TRUE)) %>%
   ungroup() %>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_sum))
+  mutate(Payment_Category = factor(Payment_Category, levels = ordered_levels_sum))
 
 Barchart_Total_Payments_By_Categories <- ggplot(Total_Finance_Categories, aes(
   x = as.factor(IMD_QUINTILE),
   y = `Total (£)`,
-  fill =  PayCat_base
+  fill =  Payment_Category
 )) +
   geom_bar(stat = "identity") +
   scale_y_continuous(labels = scales::comma)+
@@ -806,12 +806,12 @@ Registered_Patients_Finance_Categories <- Avg_Finance_Categories %>%
     grepl("\\(Registered\\)$", `Payment Category`),  
     !is.na(IMD_QUINTILE)
   ) %>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg))
+  mutate(Payment_Category = factor(Payment_Category, levels = ordered_levels_avg))
 
 Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance_Categories, aes(
   x = IMD_QUINTILE,
   y = `Total (£)`,
-  fill =  PayCat_base
+  fill =  Payment_Category
 )) +
   geom_bar(stat = "identity") +
   labs(
@@ -833,12 +833,12 @@ Weighted_Patients_Finance_Categories <- Avg_Finance_Categories %>%
     grepl("\\(Weighted\\)$", `Payment Category`),  
     !is.na(IMD_QUINTILE)
   )%>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg))
+  mutate(Payment_Category = factor(Payment_Category, levels = ordered_levels_avg))
 
 Barchart_Weighted_Patients_By_Categories <- ggplot(Weighted_Patients_Finance_Categories, aes(
   x = as.factor(IMD_QUINTILE),
   y = `Total (£)`,
-  fill =  PayCat_base
+  fill =  Payment_Category
 )) +
   geom_bar(stat = "identity") +
   labs(
@@ -860,12 +860,12 @@ Adj_Patients_Finance_Categories <- Avg_Finance_Categories %>%
     grepl("\\(ADJ\\)$", `Payment Category`),  
     !is.na(IMD_QUINTILE)
   ) %>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg))
+  mutate(Payment_Category = factor(Payment_Category, levels = ordered_levels_avg))
 
 Barchart_Adj_Patients_By_Categories <- ggplot(Adj_Patients_Finance_Categories, aes(
   x = as.factor(IMD_QUINTILE),
   y = `Total (£)`,
-  fill =  PayCat_base
+  fill =  Payment_Category
 )) +
   geom_bar(stat = "identity") +
   labs(
