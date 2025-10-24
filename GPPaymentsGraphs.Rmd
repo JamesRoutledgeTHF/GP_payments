@@ -201,13 +201,13 @@ load_ons_data <- function(year, sex) {
   
 }
 
-#ons_data_M <- lapply(year_list, load_ons_data, sex="Males")
-#ons_data_F <- lapply(year_list, load_ons_data, sex="Females")
+ons_data_M <- lapply(year_list, load_ons_data, sex="Males")
+ons_data_F <- lapply(year_list, load_ons_data, sex="Females")
 
-#ons_both <- c(ons_data_M, ons_data_F)
-ons_df <- read.csv("ons_population.csv", stringsAsFactors = FALSE)
+ons_both <- c(ons_data_M, ons_data_F)
+#ons_df <- read.csv("ons_population.csv", stringsAsFactors = FALSE)
 
-#ons_df <- as.data.frame(do.call(rbind, ons_both))
+ons_df <- as.data.frame(do.call(rbind, ons_both))
 
 ## calculate weighted LSOA populations using Carr Hill formula values from 'Level or not?'
 
