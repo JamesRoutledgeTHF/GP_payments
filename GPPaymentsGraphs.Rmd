@@ -282,36 +282,29 @@ for (i in seq_along(lsoa_attributions)) {
 
 lsoa_attributions_df <- as.data.frame(do.call(rbind, lsoa_attributions))
 
-#new code using LSOA attribution
-lsoa_prac_pc <- lsoa_attributions_df %>%
+lsoa_prac_pc = lsoa_attributions_df %>%
   mutate(YEAR = as.numeric(str_sub(EXTRACT_DATE, start = -4))) %>%
   select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
-  inner_join(adj_pop_norm %>% select(LSOA_CODE, YEAR, TOTAL_POP),
-             by = c("LSOA_CODE", "YEAR")) %>%
-  group_by(LSOA_CODE, YEAR) %>%
-  mutate(
-    total_pat_in_lsoa = sum(NUMBER_OF_PATIENTS),
-    prop_in_lsoa = NUMBER_OF_PATIENTS / total_pat_in_lsoa,
-    adj_TOTAL_POP = prop_in_lsoa * TOTAL_POP
-  ) %>%
+  group_by(PRACTICE_CODE, YEAR) %>%
+  mutate(total_pat_in_practice = sum(NUMBER_OF_PATIENTS),
+         pc = NUMBER_OF_PATIENTS / total_pat_in_practice) %>%
+  select(-NUMBER_OF_PATIENTS) %>%
   ungroup() %>%
-  mutate(
-    LSOA_DATE = case_when(
-      YEAR < 2021 ~ 2011,
-      YEAR >= 2021 ~ 2021
-    )
-  )
+  mutate(LSOA_DATE = case_when(YEAR<2021 ~ 2011,
+                               YEAR>2020 ~2021))
 
-prac_imd <- lsoa_prac_pc %>%
-  inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>%
+# assign IMD at the practice level using the attributions dataset
+prac_imd <- lsoa_prac_pc %>% 
+  inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>% 
+  inner_join(adj_pop_norm, by = c("LSOA_CODE", "YEAR")) %>%
   group_by(YEAR, PRACTICE_CODE) %>%
   summarise(
-    IMD_SCORE_PROP = sum(adj_TOTAL_POP * IMD_SCORE, na.rm = TRUE),
-    total_weighted_pop = sum(adj_TOTAL_POP, na.rm = TRUE),
-    total_pat_in_practice = sum(NUMBER_OF_PATIENTS, na.rm = TRUE)
-  ) %>%
+    IMD_SCORE_PROP = sum(pc * TOTAL_POP * IMD_SCORE, na.rm = TRUE),
+    total_weighted_pop = sum(pc * TOTAL_POP, na.rm = TRUE),
+    total_pat_in_practice = first(total_pat_in_practice)
+  ) %>% 
   mutate(
-    IMD_SCORE = IMD_SCORE_PROP / total_weighted_pop
+   IMD_SCORE = IMD_SCORE_PROP / total_weighted_pop
   ) %>%
   ungroup() %>%
   select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_pop, total_pat_in_practice)
@@ -319,102 +312,123 @@ prac_imd <- lsoa_prac_pc %>%
 prac_imd = prac_imd %>% 
   group_by(YEAR) %>%
   arrange(-IMD_SCORE) %>%
-  mutate(CUM_POP = cumsum(total_weighted_pop), PROP = CUM_POP/max(CUM_POP),
-         #IMD_DECILE=cut(PROP,10,labels=FALSE),
+ mutate(CUM_POP = cumsum(total_weighted_pop), PROP = CUM_POP/max(CUM_POP),
+         IMD_DECILE=cut(PROP,10,labels=FALSE),
          IMD_QUINTILE = ntile(PROP,5)) %>%
   select(YEAR,PRACTICE_CODE,IMD_SCORE,IMD_QUINTILE, total_weighted_pop, total_pat_in_practice )
 
-#and then again for adjusted patients
-lsoa_prac_pc_adj <- lsoa_attributions_df %>%
-  mutate(YEAR = as.numeric(str_sub(EXTRACT_DATE, start = -4))) %>%
-  select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
-  inner_join(adj_pop_norm %>% select(LSOA_CODE, YEAR, NEED_ADJ_POP),
-             by = c("LSOA_CODE", "YEAR")) %>%
-  group_by(LSOA_CODE, YEAR) %>%
-  mutate(
-    total_pat_in_lsoa = sum(NUMBER_OF_PATIENTS),
-    prop_in_lsoa = NUMBER_OF_PATIENTS / total_pat_in_lsoa,
-    adj_NEED_ADJ_POP = prop_in_lsoa * NEED_ADJ_POP
-  ) %>%
-  ungroup() %>%
-  mutate(
-    LSOA_DATE = case_when(
-      YEAR < 2021 ~ 2011,
-      YEAR >= 2021 ~ 2021
-    )
-  )
-
-prac_imd_adj <- lsoa_prac_pc_adj %>%
-  inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>%
-  group_by(YEAR, PRACTICE_CODE) %>%
-  summarise(
-    IMD_SCORE_PROP = sum(adj_NEED_ADJ_POP * IMD_SCORE, na.rm = TRUE),
-    total_weighted_need_pop = sum(adj_NEED_ADJ_POP, na.rm = TRUE),
-    total_pat_in_practice = sum(NUMBER_OF_PATIENTS, na.rm = TRUE)
-  ) %>%
-  mutate(
-    IMD_SCORE = IMD_SCORE_PROP / total_weighted_need_pop
-  ) %>%
-  ungroup() %>%
-  select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_need_pop, total_pat_in_practice)
-
-prac_imd_adj <- prac_imd_adj %>% 
+prac_imd_summary <- prac_imd %>%
   group_by(YEAR) %>%
-  arrange(desc(IMD_SCORE)) %>%
+  arrange(-IMD_SCORE) %>%
   mutate(
-    CUM_POP = cumsum(total_weighted_need_pop),
+    CUM_POP = cumsum(total_weighted_pop),
     PROP = CUM_POP / max(CUM_POP),
+    IMD_DECILE = cut(PROP, 10, labels = FALSE),
     IMD_QUINTILE = ntile(PROP, 5)
   ) %>%
+  select(YEAR, PRACTICE_CODE, IMD_SCORE, IMD_QUINTILE, total_weighted_pop, total_pat_in_practice) %>%
   ungroup() %>%
-  select(
-    YEAR,
-    PRACTICE_CODE,
-    IMD_SCORE,
-    IMD_QUINTILE,
-    total_weighted_need_pop,
-    total_pat_in_practice
-  )
+  group_by(YEAR, IMD_QUINTILE) %>%
+  summarise(
+    n_practices = n(),
+    total_weighted_pop = sum(total_weighted_pop, na.rm = TRUE),
+    total_pat_in_practice = sum(total_pat_in_practice, na.rm = TRUE)
+  ) %>%
+  arrange(YEAR, IMD_QUINTILE)
 
-#old code
-#lsoa_prac_pc = lsoa_attributions_df %>%
+#new code using LSOA attribution
+#lsoa_prac_pc <- lsoa_attributions_df %>%
  # mutate(YEAR = as.numeric(str_sub(EXTRACT_DATE, start = -4))) %>%
-  #select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
-  #group_by(PRACTICE_CODE, YEAR) %>%
-  #mutate(total_pat_in_practice = sum(NUMBER_OF_PATIENTS),
-   #      pc = NUMBER_OF_PATIENTS / total_pat_in_practice) %>%
- # select(-NUMBER_OF_PATIENTS) %>%
-  #ungroup() %>%
-  #mutate(LSOA_DATE = case_when(YEAR<2021 ~ 2011,
-   #                            YEAR>2020 ~2021))%>%
-  #filter(YEAR == 2017, PRACTICE_CODE == "A81001")
-
-# assign IMD at the practice level using the attributions dataset
-#prac_imd <- lsoa_prac_pc %>% 
- # inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>% 
-  #inner_join(adj_pop_norm, by = c("LSOA_CODE", "YEAR")) %>%
-  #group_by(YEAR, PRACTICE_CODE) %>%
-  #summarise(
-   # IMD_SCORE_PROP = sum(pc * TOTAL_POP * IMD_SCORE, na.rm = TRUE),
-    #total_weighted_pop = sum(pc * TOTAL_POP, na.rm = TRUE),
-    #total_pat_in_practice = first(total_pat_in_practice)
-  #) %>% 
-  #mutate(
-   # IMD_SCORE = IMD_SCORE_PROP / total_weighted_pop
-  #) %>%
-  #ungroup() %>%
-  #select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_pop, total_pat_in_practice)
-
-#prac_imd = lsoa_prac_pc %>% 
-  #inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>% 
- # inner_join(adj_pop_norm, by = c("LSOA_CODE", "YEAR")) %>%
-  #group_by(YEAR, PRACTICE_CODE) %>%
-  #summarise(
-  #  IMD_SCORE_PROP = sum(pc * TOTAL_POP * IMD_SCORE),
-   # TOTAL_POP = sum(pc * TOTAL_POP)
+ # select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
+ # inner_join(adj_pop_norm %>% select(LSOA_CODE, YEAR, TOTAL_POP),
+  #           by = c("LSOA_CODE", "YEAR")) %>%
+ # group_by(LSOA_CODE, YEAR) %>%
+ # mutate(
+ #   total_pat_in_lsoa = sum(NUMBER_OF_PATIENTS),
+ #   prop_in_lsoa = NUMBER_OF_PATIENTS / total_pat_in_lsoa,
+ #   adj_TOTAL_POP = prop_in_lsoa * TOTAL_POP
  # ) %>%
- # mutate(IMD_SCORE = IMD_SCORE_PROP / TOTAL_POP) %>%
- # ungroup()
+ # ungroup() %>%
+ # mutate(
+  #  LSOA_DATE = case_when(
+ #     YEAR < 2021 ~ 2011,
+    #  YEAR >= 2021 ~ 2021
+   # )
+#  )
+
+#prac_imd <- lsoa_prac_pc %>%
+#  inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>%
+#  group_by(YEAR, PRACTICE_CODE) %>%
+ # summarise(
+ #   IMD_SCORE_PROP = sum(adj_TOTAL_POP * IMD_SCORE, na.rm = TRUE),
+  #  total_weighted_pop = sum(adj_TOTAL_POP, na.rm = TRUE),
+  #  total_pat_in_practice = sum(NUMBER_OF_PATIENTS, na.rm = TRUE)
+#  ) %>%
+#  mutate(
+ #   IMD_SCORE = IMD_SCORE_PROP / total_weighted_pop
+ # ) %>%
+ # ungroup() %>%
+ ## select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_pop, total_pat_in_practice)
+
+#prac_imd = prac_imd %>% 
+ # group_by(YEAR) %>%
+ # arrange(-IMD_SCORE) %>%
+ # mutate(CUM_POP = cumsum(total_weighted_pop), PROP = CUM_POP/max(CUM_POP),
+         #IMD_DECILE=cut(PROP,10,labels=FALSE),
+ #        IMD_QUINTILE = ntile(PROP,5)) %>%
+ # select(YEAR,PRACTICE_CODE,IMD_SCORE,IMD_QUINTILE, total_weighted_pop, total_pat_in_practice )
+
+#and then again for adjusted patients
+#lsoa_prac_pc_adj <- lsoa_attributions_df %>%
+ # mutate(YEAR = as.numeric(str_sub(EXTRACT_DATE, start = -4))) %>%
+ # select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
+ # inner_join(adj_pop_norm %>% select(LSOA_CODE, YEAR, NEED_ADJ_POP),
+   #          by = c("LSOA_CODE", "YEAR")) %>%
+  #group_by(LSOA_CODE, YEAR) %>%
+#  mutate(
+#    total_pat_in_lsoa = sum(NUMBER_OF_PATIENTS),
+ #   prop_in_lsoa = NUMBER_OF_PATIENTS / total_pat_in_lsoa,
+ #   adj_NEED_ADJ_POP = prop_in_lsoa * NEED_ADJ_POP
+ # ) %>%
+ # ungroup() %>%
+ # mutate(
+   # LSOA_DATE = case_when(
+   #   YEAR < 2021 ~ 2011,
+    #  YEAR >= 2021 ~ 2021
+   # )
+  #)
+
+#prac_imd_adj <- lsoa_prac_pc_adj %>%
+  #inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>%
+  #group_by(YEAR, PRACTICE_CODE) %>%
+  #summarise(
+    #IMD_SCORE_PROP = sum(adj_NEED_ADJ_POP * IMD_SCORE, na.rm = TRUE),
+    #total_weighted_need_pop = sum(adj_NEED_ADJ_POP, na.rm = TRUE),
+   # total_pat_in_practice = sum(NUMBER_OF_PATIENTS, na.rm = TRUE)
+ # ) %>%
+ # mutate(
+   # IMD_SCORE = IMD_SCORE_PROP / total_weighted_need_pop
+  #) %>%
+ # ungroup() %>%
+ # select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_need_pop, total_pat_in_practice)
+
+#prac_imd_adj <- prac_imd_adj %>% 
+ # group_by(YEAR) %>%
+ # arrange(desc(IMD_SCORE)) %>%
+ # mutate(
+ #   CUM_POP = cumsum(total_weighted_need_pop),
+ #   PROP = CUM_POP / max(CUM_POP),
+  #  IMD_QUINTILE = ntile(PROP, 5)
+ # ) %>%
+ # ungroup() %>%
+ # select(
+  #  YEAR,
+  #  PRACTICE_CODE,
+  #  IMD_SCORE,
+  #  IMD_QUINTILE,
+  #  total_weighted_need_pop,
+  #  total_pat_in_practice
+ # )
 
 #write.csv(prac_imd, "Prac_IMD.csv", row.names = FALSE)
 ```
@@ -650,22 +664,22 @@ finances_IMD_TOTAL <- finances_GROUPED_TOTAL %>%
     .names = "{.col} {fn}"
   ))
 
-prac_imd_adj_sum <- prac_imd_adj %>%
-  mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
-  group_by(IMD_QUINTILE, YEAR) %>%
-  summarise(
-    adj_population = sum(total_weighted_need_pop, na.rm = TRUE),
-    .groups = "drop"
-  )
+#prac_imd_adj_sum <- prac_imd_adj %>%
+ # mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
+  #group_by(IMD_QUINTILE, YEAR) %>%
+ # summarise(
+  #  adj_population = sum(total_weighted_need_pop, na.rm = TRUE),
+  #  .groups = "drop"
+#  )
 
 #join the adjusted population and calculate averages again
-finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
-  left_join(prac_imd_adj_sum, by = c("IMD_QUINTILE", "YEAR")) %>%
-  mutate(across(
-    c(Global_Sum, IT_Premises, PCO_Payments, Contracted_Services, Prescribing, COVID_19, QOF),
-    list("Avg (ADJ)" = ~ . / adj_population),
-    .names = "{.col} {fn}"
-  ))
+#finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
+ # left_join(prac_imd_adj_sum, by = c("IMD_QUINTILE", "YEAR")) %>%
+ # mutate(across(
+  #  c(Global_Sum, IT_Premises, PCO_Payments, Contracted_Services, Prescribing, COVID_19, QOF),
+  #  list("Avg (ADJ)" = ~ . / adj_population),
+   # .names = "{.col} {fn}"
+ # ))
 
 #pivot long
 finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
@@ -713,20 +727,20 @@ finance_imd_registered <- finances_df %>%
   na.omit()
 
 #create adjusted patients by year
-finance_imd_ADJ <- finances_df %>%
-  left_join(prac_imd_adj, by = c("YEAR", "PRACTICE_CODE")) %>%
-  mutate(IMD_QUINTILE = as.character(IMD_QUINTILE)) %>% 
-  group_by(IMD_QUINTILE, YEAR) %>%
-  summarise(
-    TOTAL_PAYMENTS = sum(PAYMENTS, na.rm = TRUE),
-    NUM_PRACTICES = n_distinct(PRACTICE_CODE),
-    TOTAL_ADJ_POP = sum(total_weighted_need_pop, na.rm = TRUE),  
-    .groups = "drop"
-  ) %>%
-  mutate(
-    PAYMENT_PER_ADJ_PATIENT = TOTAL_PAYMENTS / TOTAL_ADJ_POP
-  ) %>%
- na.omit()
+#finance_imd_ADJ <- finances_df %>%
+ # left_join(prac_imd_adj, by = c("YEAR", "PRACTICE_CODE")) %>%
+ # mutate(IMD_QUINTILE = as.character(IMD_QUINTILE)) %>% 
+ # group_by(IMD_QUINTILE, YEAR) %>%
+ # summarise(
+  #  TOTAL_PAYMENTS = sum(PAYMENTS, na.rm = TRUE),
+  #  NUM_PRACTICES = n_distinct(PRACTICE_CODE),
+   # TOTAL_ADJ_POP = sum(total_weighted_need_pop, na.rm = TRUE),  
+   # .groups = "drop"
+ # ) %>%
+ # mutate(
+ #   PAYMENT_PER_ADJ_PATIENT = TOTAL_PAYMENTS / TOTAL_ADJ_POP
+ # ) %>%
+# na.omit()
 
 ```
 
@@ -782,8 +796,8 @@ Weighted_By_Year <- ggplot(finance_imd_weighted, aes(
   geom_point(size = 2) +
   scale_color_brewer(palette = "Set1", name = "IMD Quintile") +
   scale_x_continuous(
-    breaks = sort(unique(finance_imd_ADJ$YEAR)),  
-    labels = sort(unique(finance_imd_ADJ$YEAR))
+    breaks = sort(unique(finance_imd_weighted$YEAR)),  
+    labels = sort(unique(finance_imd_weighted$YEAR))
   ) +
   labs(
     title = "Payments per Weighted Patient by IMD Quintile",
@@ -807,8 +821,8 @@ Registered_By_Year <- ggplot(finance_imd_registered, aes(
   geom_point(size = 2) +
   scale_color_brewer(palette = "Set1", name = "IMD Quintile") +
   scale_x_continuous(
-    breaks = sort(unique(finance_imd_ADJ$YEAR)),  
-    labels = sort(unique(finance_imd_ADJ$YEAR))
+    breaks = sort(unique(finance_imd_registered$YEAR)),  
+    labels = sort(unique(finance_imd_registered$YEAR))
   ) +
   labs(
     title = "Payments per Registered Patient by IMD Quintile",
@@ -822,30 +836,30 @@ Registered_By_Year <- ggplot(finance_imd_registered, aes(
     strip.text = element_text(face = "bold")
   )
 
-Adj_By_Year <- ggplot(finance_imd_ADJ, aes(
-  x = YEAR,
-  y = PAYMENT_PER_ADJ_PATIENT,
-  color = as.factor(IMD_QUINTILE),
-  group = IMD_QUINTILE
-)) +
-  geom_line(linewidth = 1) +
- geom_point(size = 2) +
-  scale_color_brewer(palette = "Set1", name = "IMD Quintile") +
-  scale_x_continuous(
-    breaks = sort(unique(finance_imd_ADJ$YEAR)),  
-    labels = sort(unique(finance_imd_ADJ$YEAR))
-  ) +
- labs(
-   title = "Payments per ADJ Patient by IMD Quintile",
-    x = "Year",
-    y = "Payment per ADJ Patient (£)"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    legend.position = "right",
-    panel.grid.minor = element_blank(),
-    strip.text = element_text(face = "bold")
-  )
+#Adj_By_Year <- ggplot(finance_imd_ADJ, aes(
+ # x = YEAR,
+ # y = PAYMENT_PER_ADJ_PATIENT,
+ # color = as.factor(IMD_QUINTILE),
+ # group = IMD_QUINTILE
+#)) +
+ # geom_line(linewidth = 1) +
+# geom_point(size = 2) +
+ # scale_color_brewer(palette = "Set1", name = "IMD Quintile") +
+ # scale_x_continuous(
+ #   breaks = sort(unique(finance_imd_ADJ$YEAR)),  
+  #  labels = sort(unique(finance_imd_ADJ$YEAR))
+ # ) +
+ #labs(
+  # title = "Payments per ADJ Patient by IMD Quintile",
+  #  x = "Year",
+  #  y = "Payment per ADJ Patient (£)"
+ # ) +
+ # theme_minimal(base_size = 14) +
+#  theme(
+  #  legend.position = "right",
+  #  panel.grid.minor = element_blank(),
+  #  strip.text = element_text(face = "bold")
+  #)
 
 Total_Finance_Categories <- Total_Finance_Categories %>%
   filter(
@@ -963,7 +977,7 @@ Barchart_Adj_Patients_By_Categories <- ggplot(Adj_Patients_Finance_Categories, a
 #print in Markdown
 print(Weighted_By_Year)
 print(Registered_By_Year)
-print(Adj_By_Year)
+#print(Adj_By_Year)
 print(Barchart_Total_Payments_By_Categories)
 print(Barchart_Registered_Patients_By_Categories)
 print(Barchart_Weighted_Patients_By_Categories)
@@ -974,11 +988,11 @@ print(Barchart_Adj_Patients_By_Categories)
 plot_list <- list(
   Weighted_By_Year,
   Registered_By_Year,
-  Adj_By_Year,
+ # Adj_By_Year,
   Barchart_Total_Payments_By_Categories,
   Barchart_Registered_Patients_By_Categories,
-  Barchart_Weighted_Patients_By_Categories,
-  Barchart_Adj_Patients_By_Categories
+  Barchart_Weighted_Patients_By_Categories
+  #Barchart_Adj_Patients_By_Categories
 )
 
 # Export all plots to a single PDF
