@@ -1,7 +1,7 @@
 ---
 title: "GPpaymentGraphs"
 output: word_document
-date: "2025-10-15"
+date: "2025-11-11"
 ---
 
 ```{r load-imd}
@@ -317,119 +317,6 @@ prac_imd = prac_imd %>%
          IMD_QUINTILE = ntile(PROP,5)) %>%
   select(YEAR,PRACTICE_CODE,IMD_SCORE,IMD_QUINTILE, total_weighted_pop, total_pat_in_practice )
 
-prac_imd_summary <- prac_imd %>%
-  group_by(YEAR) %>%
-  arrange(-IMD_SCORE) %>%
-  mutate(
-    CUM_POP = cumsum(total_weighted_pop),
-    PROP = CUM_POP / max(CUM_POP),
-    IMD_DECILE = cut(PROP, 10, labels = FALSE),
-    IMD_QUINTILE = ntile(PROP, 5)
-  ) %>%
-  select(YEAR, PRACTICE_CODE, IMD_SCORE, IMD_QUINTILE, total_weighted_pop, total_pat_in_practice) %>%
-  ungroup() %>%
-  group_by(YEAR, IMD_QUINTILE) %>%
-  summarise(
-    n_practices = n(),
-    total_weighted_pop = sum(total_weighted_pop, na.rm = TRUE),
-    total_pat_in_practice = sum(total_pat_in_practice, na.rm = TRUE)
-  ) %>%
-  arrange(YEAR, IMD_QUINTILE)
-
-#new code using LSOA attribution
-#lsoa_prac_pc <- lsoa_attributions_df %>%
- # mutate(YEAR = as.numeric(str_sub(EXTRACT_DATE, start = -4))) %>%
- # select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
- # inner_join(adj_pop_norm %>% select(LSOA_CODE, YEAR, TOTAL_POP),
-  #           by = c("LSOA_CODE", "YEAR")) %>%
- # group_by(LSOA_CODE, YEAR) %>%
- # mutate(
- #   total_pat_in_lsoa = sum(NUMBER_OF_PATIENTS),
- #   prop_in_lsoa = NUMBER_OF_PATIENTS / total_pat_in_lsoa,
- #   adj_TOTAL_POP = prop_in_lsoa * TOTAL_POP
- # ) %>%
- # ungroup() %>%
- # mutate(
-  #  LSOA_DATE = case_when(
- #     YEAR < 2021 ~ 2011,
-    #  YEAR >= 2021 ~ 2021
-   # )
-#  )
-
-#prac_imd <- lsoa_prac_pc %>%
-#  inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>%
-#  group_by(YEAR, PRACTICE_CODE) %>%
- # summarise(
- #   IMD_SCORE_PROP = sum(adj_TOTAL_POP * IMD_SCORE, na.rm = TRUE),
-  #  total_weighted_pop = sum(adj_TOTAL_POP, na.rm = TRUE),
-  #  total_pat_in_practice = sum(NUMBER_OF_PATIENTS, na.rm = TRUE)
-#  ) %>%
-#  mutate(
- #   IMD_SCORE = IMD_SCORE_PROP / total_weighted_pop
- # ) %>%
- # ungroup() %>%
- ## select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_pop, total_pat_in_practice)
-
-#prac_imd = prac_imd %>% 
- # group_by(YEAR) %>%
- # arrange(-IMD_SCORE) %>%
- # mutate(CUM_POP = cumsum(total_weighted_pop), PROP = CUM_POP/max(CUM_POP),
-         #IMD_DECILE=cut(PROP,10,labels=FALSE),
- #        IMD_QUINTILE = ntile(PROP,5)) %>%
- # select(YEAR,PRACTICE_CODE,IMD_SCORE,IMD_QUINTILE, total_weighted_pop, total_pat_in_practice )
-
-#and then again for adjusted patients
-#lsoa_prac_pc_adj <- lsoa_attributions_df %>%
- # mutate(YEAR = as.numeric(str_sub(EXTRACT_DATE, start = -4))) %>%
- # select(YEAR, PRACTICE_CODE, PRACTICE_NAME, LSOA_CODE, NUMBER_OF_PATIENTS) %>%
- # inner_join(adj_pop_norm %>% select(LSOA_CODE, YEAR, NEED_ADJ_POP),
-   #          by = c("LSOA_CODE", "YEAR")) %>%
-  #group_by(LSOA_CODE, YEAR) %>%
-#  mutate(
-#    total_pat_in_lsoa = sum(NUMBER_OF_PATIENTS),
- #   prop_in_lsoa = NUMBER_OF_PATIENTS / total_pat_in_lsoa,
- #   adj_NEED_ADJ_POP = prop_in_lsoa * NEED_ADJ_POP
- # ) %>%
- # ungroup() %>%
- # mutate(
-   # LSOA_DATE = case_when(
-   #   YEAR < 2021 ~ 2011,
-    #  YEAR >= 2021 ~ 2021
-   # )
-  #)
-
-#prac_imd_adj <- lsoa_prac_pc_adj %>%
-  #inner_join(imd_2011_2021, by = c("LSOA_CODE", "LSOA_DATE")) %>%
-  #group_by(YEAR, PRACTICE_CODE) %>%
-  #summarise(
-    #IMD_SCORE_PROP = sum(adj_NEED_ADJ_POP * IMD_SCORE, na.rm = TRUE),
-    #total_weighted_need_pop = sum(adj_NEED_ADJ_POP, na.rm = TRUE),
-   # total_pat_in_practice = sum(NUMBER_OF_PATIENTS, na.rm = TRUE)
- # ) %>%
- # mutate(
-   # IMD_SCORE = IMD_SCORE_PROP / total_weighted_need_pop
-  #) %>%
- # ungroup() %>%
- # select(YEAR, PRACTICE_CODE, IMD_SCORE, total_weighted_need_pop, total_pat_in_practice)
-
-#prac_imd_adj <- prac_imd_adj %>% 
- # group_by(YEAR) %>%
- # arrange(desc(IMD_SCORE)) %>%
- # mutate(
- #   CUM_POP = cumsum(total_weighted_need_pop),
- #   PROP = CUM_POP / max(CUM_POP),
-  #  IMD_QUINTILE = ntile(PROP, 5)
- # ) %>%
- # ungroup() %>%
- # select(
-  #  YEAR,
-  #  PRACTICE_CODE,
-  #  IMD_SCORE,
-  #  IMD_QUINTILE,
-  #  total_weighted_need_pop,
-  #  total_pat_in_practice
- # )
-
 #write.csv(prac_imd, "Prac_IMD.csv", row.names = FALSE)
 ```
 
@@ -492,7 +379,8 @@ write.csv(workforce_imd, "workforce.csv")
 ## finance datasets
 temp_finance <- list.files("data/payments", pattern = "\\.csv$", full.names = TRUE)
 
-finance_datasets <- lapply(temp_finance, function(file) {
+#for the time-series plots 
+finance_datasets_timeseries <- lapply(temp_finance, function(file) {
 
   #get year from the csv names and set to 20XX
   year <- as.numeric(gsub(".*?([0-9]{2,4}).*", "\\1", file))
@@ -504,74 +392,14 @@ finance_datasets <- lapply(temp_finance, function(file) {
   #select and rename columns of interest
   columns <- list(
     PRACTICE_CODE = "practice.code",
-    CONTRACT_TYPE = "contract.type",
+    #CONTRACT_TYPE = "contract.type", #remove this for this - can add back in if want to choose contract type 
     WEIGHTED_PATIENTS = c("average.number.of.weighted.patients", 
                           "number.of.weighted.patients..last.known.figure.",
                           "average.number.of.weighted.patients1"),
     REGISTERED_PATIENTS = c("average.number.of.registered.patients", 
                             "number.of.registered.patients..last.known.figure.",
                             "average.number.of.registered.patients1"),
-    PAYMENTS_MINUS_DEDUCTIONS = "total.nhs.payments.to.general.practice.minus.deductions",
-    PAYMENTS = "total.nhs.payments.to.general.practice",
-    TOTAL_PAYMENTS = "total.nhs.payments.to.general.practice.including.covid.and.pcn.payments",
-    TOTAL_COVID_PAYMENTS = c("total.nhs.payments.including.covid.vaccination.and.covid.support.and.expansion.payments",
-                             "total.nhs.payments.to.general.practice.including.covid.vaccination..covid.support.and.long.covid.payments"),
-    TOTAL_PCN_PAYMENTS = "total.nhs.payments.including.pcn.workforce..leadership.and.support",
-    PRESCRIBING_FEE = "prescribing.fee.payments",
-    DISPENSING_FEE = "dispensing.fee.payments",
-    REINBURSMENT_FEE = "reimbursement.of.drugs",
-    OTHER_PAYMENTS = "other.payments",
-    GLOBAL_SUM = "global.sum",
-    MPIG = "mpig.correction.factor",
-    IT = "information.management.and.technology",
-    PMS_BALANCE = "balance.of.pms.expenditure",
-    QOF_PAYMENT = "total.qof.payments",
-    CHILD_VACCINE = "childhood.vaccination.and.immunisation.scheme",
-    FLU_VACCINE = "influenza.and.pneumococcal.immunisations",
-    ROTAVIRUS_VACCINE = "rotavirus.and.shingles.immunisation",
-    PREMISES_PAYMENT = "premises.payments",
-    COVID_IMMUN = "covid.immunisation",
-    COVID_SUPPORT = "covid.support.and.expansion",
-    LONG_COVID = "long.covid",
-    ALCOHOL = "alcohol",
-    GP_EXTENDED = "gp.extended.hours.access",
-    FTDD = "facilitating.timely.diagnosis.and.support.for.people.with.dementia",
-    IPOA = "improving.patient.online.access",
-    LD = "learning.disabilities",
-    MS = "minor.surgery",
-    PP = "patient.participation",
-    RCM = "remote.care.monitoring",
-    RPCM = "risk.profiling.and.case.management",
-    SFVP = "services.for.violent.patients",
-    UA = "unplanned.admissions",
-    TNES = "total.national.enhanced.services",
-    TLES = "total.local.enhanced.services",
-    NDES = "non.des.item.pneumococcal.vaccine",
-    OOAIHUC = "out.of.area.in.hours.urgent.care",
-    MENINGITIS = "meningitis",
-    PERTUSSIS = "pertussis",
-    TLIS = "total.local.incentive.schemes",
-    LIS = "local.incentive.schemes",
-    WMS = "weight.management.service",
-    MAR = "medical.assessment.reviews",
-    SENIORITY = "seniority",
-    DRSP = "doctors.retainer.scheme.payments",
-    TLA = "total.locum.allowances",
-    AC = "appraisal.costs",
-    PCO = "pco.admin.other",
-    GPFV = "general.practice.forward.view",
-    GPT = "general.practice.transformation",
-    WAF = "winter.access.fund",
-    PSL = "prolonged.study.leave",
-    AACIRL = "appraisal.*appraiser.costs.in.respect.of.locums",
-    PCNP = "pcn.participation",
-    PCNL = "pcn.leadership",
-    PCNS = "pcn.support",
-    PCNEHA = "pcn.extended.hours.access",
-    PCNW = "pcn.workforce",
-    PCNIIF = "pcn.investment.and.impact.fund",
-    PCNCHP = "pcn.care.home.premium",
-    PCNEA = "pcn.enhanced.access"
+    PAYMENTS = "total.nhs.payments.to.general.practice"
   )
 
   #Check to see if columns with multiple options exist in the data, otherwise put as NA.
@@ -591,7 +419,85 @@ finance_datasets <- lapply(temp_finance, function(file) {
 })
 
 #combine all dfs into one df 
-finances_df <- dplyr::bind_rows(finance_datasets)
+finances_df_timeseries <- dplyr::bind_rows(finance_datasets_timeseries)
+
+#for the year 23/24 barcharts
+finance_datasets_barcharts <- lapply(temp_finance, function(file) {
+
+  #get year from the csv names and set to 20XX
+   year <- as.numeric(gsub(".*?([0-9]{2,4}).*", "\\1", file))
+  if (year != 23) return(NULL)  # skip all files that aren't 2023
+  
+  #read in finance files and set columns to lowercase
+  finances <- read.csv(file)
+  names(finances) <- tolower(names(finances))
+
+  #select and rename columns of interest
+  columns <- list(
+    PRACTICE_CODE = "practice.code",
+    CONTRACT_TYPE = "contract.type",
+    WEIGHTED_PATIENTS = "average.number.of.weighted.patients", 
+    REGISTERED_PATIENTS = "average.number.of.registered.patients",
+    PAYMENTS_MINUS_DEDUCTIONS = "total.nhs.payments.to.general.practice.minus.deductions",
+    PAYMENTS = "total.nhs.payments.to.general.practice",
+    TOTAL_COVID_PAYMENTS = "total.nhs.payments.to.general.practice.including.covid.vaccination..covid.support.and.long.covid.payments",
+    PRESCRIBING_FEE = "prescribing.fee.payments",
+    DISPENSING_FEE = "dispensing.fee.payments",
+    REINBURSMENT_FEE = "reimbursement.of.drugs",
+    OTHER_PAYMENTS = "other.payments",
+    GLOBAL_SUM = "global.sum",
+    MPIG = "mpig.correction.factor",
+    IT = "information.management.and.technology",
+    PMS_BALANCE = "balance.of.pms.expenditure",
+    QOF_PAYMENT = "total.qof.payments",
+    CHILD_VACCINE = "childhood.vaccination.and.immunisation.scheme",
+    FLU_VACCINE = "influenza.and.pneumococcal.immunisations",
+    ROTAVIRUS_VACCINE = "rotavirus.and.shingles.immunisation",
+    PREMISES_PAYMENT = "premises.payments",
+    COVID_IMMUN = "covid.immunisation",
+    COVID_SUPPORT = "covid.support.and.expansion",
+    LONG_COVID = "long.covid",
+    GP_EXTENDED = "gp.extended.hours.access",
+    LD = "learning.disabilities",
+    MS = "minor.surgery",
+    SFVP = "services.for.violent.patients",
+    NDES = "non.des.item.pneumococcal.vaccine..childhood.immunisation.main.programme",
+    OOAIHUC = "out.of.area.in.hours.urgent.care",
+    MENINGITIS = "meningitis",
+    PERTUSSIS = "pertussis",
+    LIS = "local.incentive.schemes",
+    WMS = "weight.management.service",
+    MAR = "medical.assessment.reviews",
+    SENIORITY = "seniority",
+    DRSP = "doctors.retainer.scheme.payments",
+    TLA = "total.locum.allowances",
+    PCO = "pco.admin.other",
+    GPT = "general.practice.transformation",
+    WAF = "winter.access.fund",
+    PSL = "prolonged.study.leave",
+    AACIRL = "appraisal...appraiser.costs.in.respect.of.locums",
+    PCNP = "pcn.participation"
+
+  )
+
+  #Check to see if columns with multiple options exist in the data, otherwise put as NA.
+  get_col <- function(patterns) {
+   match <- intersect(patterns, names(finances))
+    if (length(match)) finances[[match[1]]] else rep(NA, nrow(finances))
+  }
+  
+  # Ensure columns converted to numeric except for PC, CT and YEAR 
+  df <- as.data.frame(lapply(columns, get_col)) %>%
+    mutate(
+     YEAR = 2000 + year,
+     across(-any_of(c("PRACTICE_CODE", "CONTRACT_TYPE", "YEAR")))
+  )
+ 
+  df
+})
+
+#combine all dfs into one df 
+finances_df_barchart <- dplyr::bind_rows(finance_datasets_barcharts)
 
 ```
 
@@ -603,19 +509,15 @@ globalSum <- c("GLOBAL_SUM", "MPIG", "PMS_BALANCE")
 ITPremises <- c("PREMISES_PAYMENT", "IT")
 
 PCO <- c(
-  "SENIORITY", "DRSP", "TLA", "AC", "PCO", "OTHER_PAYMENTS",
-  "GPFV", "GPT", "WAF", "PSL", "AACIRL",
-  "PCNP", "PCNL", "PCNS", "PCNEHA", "PCNW",
-  "PCNIIF", "PCNCHP", "PCNEA"
+  "SENIORITY", "DRSP", "TLA", "PCO", "OTHER_PAYMENTS", "GPT", "PSL", "AACIRL",
+  "PCNP", "WAF"
 )
 
 QOF <- c("QOF_PAYMENT")
 
 contractedServices <- c(
-  "ALCOHOL", "CHILD_VACCINE", "GP_EXTENDED", "FTDD", "IPOA", "FLU_VACCINE", "LD",
-  "MS", "PP", "RCM", "RPCM", "ROTAVIRUS_VACCINE", "SFVP", "UA",
-  "TNES", "TLES", "NDES", "OOAIHUC", "MENINGITIS", "PERTUSSIS",
-  "TLIS", "LIS", "WMS", "MAR"
+  "CHILD_VACCINE", "GP_EXTENDED", "FLU_VACCINE", "LD",
+  "MS", "ROTAVIRUS_VACCINE", "SFVP", "OOAIHUC", "MENINGITIS", "PERTUSSIS", "LIS", "WMS", "MAR"
 )
 
 COVID <- c("COVID_IMMUN", "COVID_SUPPORT", "LONG_COVID")
@@ -623,11 +525,11 @@ COVID <- c("COVID_IMMUN", "COVID_SUPPORT", "LONG_COVID")
 Prescribing <- c("PRESCRIBING_FEE", "DISPENSING_FEE", "REINBURSMENT_FEE")
 
 #ensure covid columns are numeric
-finances_df <- finances_df %>%
+finances_df_barchart <- finances_df_barchart %>%
   mutate(across(any_of(COVID), as.numeric))
 
 #calculate grouped totals 
-finances_GROUPED_TOTAL <- finances_df %>%
+finances_GROUPED_TOTAL <- finances_df_barchart %>%
   mutate(
     Total.Global.Sum          = rowSums(across(all_of(globalSum)), na.rm = TRUE),
     Total.IT.Premises         = rowSums(across(all_of(ITPremises)), na.rm = TRUE),
@@ -664,23 +566,6 @@ finances_IMD_TOTAL <- finances_GROUPED_TOTAL %>%
     .names = "{.col} {fn}"
   ))
 
-#prac_imd_adj_sum <- prac_imd_adj %>%
- # mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
-  #group_by(IMD_QUINTILE, YEAR) %>%
- # summarise(
-  #  adj_population = sum(total_weighted_need_pop, na.rm = TRUE),
-  #  .groups = "drop"
-#  )
-
-#join the adjusted population and calculate averages again
-#finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
- # left_join(prac_imd_adj_sum, by = c("IMD_QUINTILE", "YEAR")) %>%
- # mutate(across(
-  #  c(Global_Sum, IT_Premises, PCO_Payments, Contracted_Services, Prescribing, COVID_19, QOF),
-  #  list("Avg (ADJ)" = ~ . / adj_population),
-   # .names = "{.col} {fn}"
- # ))
-
 #pivot long
 finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
   pivot_longer(
@@ -698,7 +583,7 @@ finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
 #create dfs for time series total payments
 
 #create weighted patients by year 
-finance_imd_weighted <- finances_df %>%
+finance_imd_weighted <- finances_df_timeseries %>%
   left_join(prac_imd, by = c("YEAR", "PRACTICE_CODE")) %>%
   mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
   group_by(IMD_QUINTILE, YEAR) %>%
@@ -714,7 +599,7 @@ finance_imd_weighted <- finances_df %>%
   na.omit()
 
 #created registered patients by year
-finance_imd_registered <- finances_df %>%
+finance_imd_registered <- finances_df_timeseries %>%
   mutate(YEAR = as.numeric(YEAR),
          REGISTERED_PATIENTS = as.numeric(REGISTERED_PATIENTS),
          PAYMENTS = as.numeric(PAYMENTS)) %>%
@@ -725,22 +610,6 @@ finance_imd_registered <- finances_df %>%
             TOTAL_REGISTERED = sum(REGISTERED_PATIENTS, na.rm=T)) %>%
   mutate(PAYMENT_PER_REGISTERED_PATIENT = TOTAL_PAYMENTS/TOTAL_REGISTERED) %>%
   na.omit()
-
-#create adjusted patients by year
-#finance_imd_ADJ <- finances_df %>%
- # left_join(prac_imd_adj, by = c("YEAR", "PRACTICE_CODE")) %>%
- # mutate(IMD_QUINTILE = as.character(IMD_QUINTILE)) %>% 
- # group_by(IMD_QUINTILE, YEAR) %>%
- # summarise(
-  #  TOTAL_PAYMENTS = sum(PAYMENTS, na.rm = TRUE),
-  #  NUM_PRACTICES = n_distinct(PRACTICE_CODE),
-   # TOTAL_ADJ_POP = sum(total_weighted_need_pop, na.rm = TRUE),  
-   # .groups = "drop"
- # ) %>%
- # mutate(
- #   PAYMENT_PER_ADJ_PATIENT = TOTAL_PAYMENTS / TOTAL_ADJ_POP
- # ) %>%
-# na.omit()
 
 ```
 
@@ -758,21 +627,21 @@ finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
 #order levels for barplots
 ordered_levels_avg <- c(
   "COVID_19 Avg",
-  "IT_Premises Avg",
-  "QOF Avg",
-  "Contracted_Services Avg",
   "Prescribing Avg",
-  "PCO_Payments Avg",
+    "PCO_Payments Avg",
+    "QOF Avg",
+  "IT_Premises Avg",
+  "Contracted_Services Avg",
   "Global_Sum Avg"
 )
 
 ordered_levels_sum <- c(
   "COVID_19",
-  "IT_Premises",
-  "QOF",
-  "Contracted_Services",
   "Prescribing",
-  "PCO_Payments",
+    "PCO_Payments",
+    "QOF",
+  "IT_Premises",
+  "Contracted_Services",
   "Global_Sum"
 )
 
@@ -836,34 +705,10 @@ Registered_By_Year <- ggplot(finance_imd_registered, aes(
     strip.text = element_text(face = "bold")
   )
 
-#Adj_By_Year <- ggplot(finance_imd_ADJ, aes(
- # x = YEAR,
- # y = PAYMENT_PER_ADJ_PATIENT,
- # color = as.factor(IMD_QUINTILE),
- # group = IMD_QUINTILE
-#)) +
- # geom_line(linewidth = 1) +
-# geom_point(size = 2) +
- # scale_color_brewer(palette = "Set1", name = "IMD Quintile") +
- # scale_x_continuous(
- #   breaks = sort(unique(finance_imd_ADJ$YEAR)),  
-  #  labels = sort(unique(finance_imd_ADJ$YEAR))
- # ) +
- #labs(
-  # title = "Payments per ADJ Patient by IMD Quintile",
-  #  x = "Year",
-  #  y = "Payment per ADJ Patient (£)"
- # ) +
- # theme_minimal(base_size = 14) +
-#  theme(
-  #  legend.position = "right",
-  #  panel.grid.minor = element_blank(),
-  #  strip.text = element_text(face = "bold")
-  #)
 
 Total_Finance_Categories <- Total_Finance_Categories %>%
   filter(
-    YEAR == 2022,
+    YEAR == 2023,
     !is.na(IMD_QUINTILE),
     !grepl("\\(Registered\\)|\\(Weighted\\)|\\(ADJ\\)", `Payment Category`, ignore.case = TRUE),
     !grepl("REGISTERED|WEIGHTED|adj_population|Total Population", `Payment Category`, ignore.case = TRUE)
@@ -881,7 +726,7 @@ Barchart_Total_Payments_By_Categories <- ggplot(Total_Finance_Categories, aes(
   geom_bar(stat = "identity") +
   scale_y_continuous(labels = scales::comma)+
   labs(
-    title = "Total NHS Payments by IMD Quintile (2022)",
+    title = "Total NHS Payments by IMD Quintile (2023)",
     x = "IMD Quintile (1 = Most Deprived, 5 = Least Deprived)",
     y = "Total Payments (£)"
   ) +
@@ -895,7 +740,7 @@ Barchart_Total_Payments_By_Categories <- ggplot(Total_Finance_Categories, aes(
 
 Registered_Patients_Finance_Categories <- Avg_Finance_Categories %>%
   filter(
-    YEAR == 2022,
+    YEAR == 2023,
     grepl("\\(Registered\\)$", `Payment Category`),  
     !is.na(IMD_QUINTILE)
   ) %>%
@@ -908,7 +753,7 @@ Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance
 )) +
   geom_bar(stat = "identity") +
   labs(
-    title = "Average NHS Payments per Registered Patient by IMD Quintile (2022)",
+    title = "Average NHS Payments per Registered Patient by IMD Quintile (2023)",
     x = "IMD Quintile (1 = Most Deprived, 5 = Least Deprived)",
     y = "Average Payment per Registered Patient (£)"
   ) +
@@ -922,7 +767,7 @@ Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance
 
 Weighted_Patients_Finance_Categories <- Avg_Finance_Categories %>%
   filter(
-    YEAR == 2022,
+    YEAR == 2023,
     grepl("\\(Weighted\\)$", `Payment Category`),  
     !is.na(IMD_QUINTILE)
   )%>%
@@ -935,40 +780,13 @@ Barchart_Weighted_Patients_By_Categories <- ggplot(Weighted_Patients_Finance_Cat
 )) +
   geom_bar(stat = "identity") +
   labs(
-    title = "Average NHS Payments per Weighted Patient by IMD Quintile (2022)",
+    title = "Average NHS Payments per Weighted Patient by IMD Quintile (2023)",
     x = "IMD Quintile (1 = Most Deprived, 5 = Least Deprived)",
     y = "Average Payment per Weighted Patient (£)"
   ) +
   theme_minimal(base_size = 14) +
   theme(
     legend.position = "right",
-    panel.grid.minor = element_blank(),
-    axis.text.x = element_text(face = "bold"),
-    plot.title = element_text(face = "bold", size = 16)
-  )
-
-Adj_Patients_Finance_Categories <- Avg_Finance_Categories %>%
-  filter(
-    YEAR == 2022,
-   grepl("\\(ADJ\\)$", `Payment Category`),  
-    !is.na(IMD_QUINTILE)
-  ) %>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg))
-
-Barchart_Adj_Patients_By_Categories <- ggplot(Adj_Patients_Finance_Categories, aes(
-  x = as.factor(IMD_QUINTILE),
-  y = `Total (£)`,
-  fill =  PayCat_base
-)) +
-  geom_bar(stat = "identity") +
-  labs(
-    title = "Average NHS Payments per Adjusted Patient by IMD Quintile (2022)",
-    x = "IMD Quintile (1 = Most Deprived, 5 = Least Deprived)",
-    y = "Average Payment per Adjusted Patient (£)"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-   legend.position = "right",
     panel.grid.minor = element_blank(),
     axis.text.x = element_text(face = "bold"),
     plot.title = element_text(face = "bold", size = 16)
@@ -981,7 +799,7 @@ print(Registered_By_Year)
 print(Barchart_Total_Payments_By_Categories)
 print(Barchart_Registered_Patients_By_Categories)
 print(Barchart_Weighted_Patients_By_Categories)
-print(Barchart_Adj_Patients_By_Categories)
+#print(Barchart_Adj_Patients_By_Categories)
 
 #For ease to print into a PDF cleanly
 # Create a list of all plots
