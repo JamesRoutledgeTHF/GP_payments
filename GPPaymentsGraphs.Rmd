@@ -399,8 +399,8 @@ finance_datasets_timeseries <- lapply(temp_finance, function(file) {
     REGISTERED_PATIENTS = c("average.number.of.registered.patients", 
                             "number.of.registered.patients..last.known.figure.",
                             "average.number.of.registered.patients1"),
-    PAYMENTS = "total.nhs.payments.to.general.practice"
-  )
+    PAYMENTS = "total.nhs.payments.to.general.practice",
+    PAYMENTS_MINUS_DEDUCTIONS = c("total.nhs.payments.to.general.practice.minus.deductions","total.nhs.payments.to.general.practice.minus.deductions2"))
 
   #Check to see if columns with multiple options exist in the data, otherwise put as NA.
   get_col <- function(patterns) {
@@ -589,7 +589,7 @@ finance_imd_weighted <- finances_df_timeseries %>%
   group_by(IMD_QUINTILE, YEAR) %>%
   summarise(
     TOTAL_PAYMENTS = sum(
-      PAYMENTS,
+      PAYMENTS_MINUS_DEDUCTIONS,
       na.rm = TRUE
     ),
     TOTAL_WEIGHTED = sum(WEIGHTED_PATIENTS, na.rm = TRUE),
@@ -606,7 +606,7 @@ finance_imd_registered <- finances_df_timeseries %>%
   left_join(prac_imd, by=c("YEAR", "PRACTICE_CODE")) %>%
   mutate(IMD_QUINTILE = as.factor(IMD_QUINTILE)) %>%
   group_by(IMD_QUINTILE, YEAR) %>%
-  summarise(TOTAL_PAYMENTS = sum(PAYMENTS, na.rm=T),
+  summarise(TOTAL_PAYMENTS = sum(PAYMENTS_MINUS_DEDUCTIONS, na.rm=T),
             TOTAL_REGISTERED = sum(REGISTERED_PATIENTS, na.rm=T)) %>%
   mutate(PAYMENT_PER_REGISTERED_PATIENT = TOTAL_PAYMENTS/TOTAL_REGISTERED) %>%
   na.omit()
