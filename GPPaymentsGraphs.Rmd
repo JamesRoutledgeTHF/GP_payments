@@ -515,9 +515,18 @@ PCO <- c(
 
 QOF <- c("QOF_PAYMENT")
 
-contractedServices <- c(
-  "CHILD_VACCINE", "GP_EXTENDED", "FLU_VACCINE", "LD",
-  "MS", "ROTAVIRUS_VACCINE", "SFVP", "OOAIHUC", "MENINGITIS", "PERTUSSIS", "LIS", "WMS", "MAR"
+#contractedServices <- c(
+ # "CHILD_VACCINE", "GP_EXTENDED", "FLU_VACCINE", "LD",
+ # "MS", "ROTAVIRUS_VACCINE", "SFVP", "OOAIHUC", "MENINGITIS", "PERTUSSIS", "LIS", "WMS", "MAR"
+#)
+
+DirectedEnhancedServices <- c(
+  "CHILD_VACCINE", "FLU_VACCINE", "LD",
+  "MS", "ROTAVIRUS_VACCINE", "SFVP", "OOAIHUC", "MENINGITIS", "PERTUSSIS", "WMS", "MAR"
+)
+
+LocalIncentiveSchemes <- c(
+  "GP_EXTENDED","LIS"
 )
 
 COVID <- c("COVID_IMMUN", "COVID_SUPPORT", "LONG_COVID")
@@ -534,7 +543,8 @@ finances_GROUPED_TOTAL <- finances_df_barchart %>%
     Total.Global.Sum          = rowSums(across(all_of(globalSum)), na.rm = TRUE),
     Total.IT.Premises         = rowSums(across(all_of(ITPremises)), na.rm = TRUE),
     Total.PCO                 = rowSums(across(all_of(PCO)), na.rm = TRUE),
-    Total.Contracted.Services = rowSums(across(all_of(contractedServices)), na.rm = TRUE),
+    Total.DirectedEnhancedServices = rowSums(across(all_of(DirectedEnhancedServices)), na.rm = TRUE),
+    Total.LocalIncentiveSchemes = rowSums(across(all_of(LocalIncentiveSchemes)), na.rm = TRUE),
     Total.Prescribing         = rowSums(across(all_of(Prescribing)), na.rm = TRUE),
     Total.COVID               = rowSums(across(all_of(COVID)), na.rm = TRUE)
   )
@@ -549,7 +559,8 @@ finances_IMD_TOTAL <- finances_GROUPED_TOTAL %>%
     Global_Sum          = sum(Total.Global.Sum, na.rm = TRUE),
     IT_Premises         = sum(Total.IT.Premises, na.rm = TRUE),
     PCO_Payments        = sum(Total.PCO, na.rm = TRUE),
-    Contracted_Services = sum(Total.Contracted.Services, na.rm = TRUE),
+    Directed_Enhanced_Services = sum(Total.DirectedEnhancedServices, na.rm = TRUE),
+    Local_Incentive_Schemes = sum(Total.LocalIncentiveSchemes, na.rm = TRUE),
     Prescribing         = sum(Total.Prescribing, na.rm = TRUE),
     COVID_19            = sum(Total.COVID, na.rm = TRUE),
     QOF                 = sum(QOF_PAYMENT, na.rm = TRUE),
@@ -558,7 +569,7 @@ finances_IMD_TOTAL <- finances_GROUPED_TOTAL %>%
     .groups = "drop"
   ) %>%
   mutate(across(
-    c(Global_Sum, IT_Premises, PCO_Payments, Contracted_Services, Prescribing, COVID_19, QOF),
+    c(Global_Sum, IT_Premises, PCO_Payments, Directed_Enhanced_Services, Local_Incentive_Schemes, Prescribing, COVID_19, QOF),
     list(
       "Avg (Registered)" = ~ . / REGISTERED,
       "Avg (Weighted)"   = ~ . / WEIGHTED
@@ -628,20 +639,22 @@ finances_IMD_TOTAL <- finances_IMD_TOTAL %>%
 ordered_levels_avg <- c(
   "COVID_19 Avg",
   "Prescribing Avg",
-    "PCO_Payments Avg",
-    "QOF Avg",
+  "Directed_Enhanced_Services Avg",
+  "Local_Incentive_Schemes Avg",
+  "PCO_Payments Avg",
+  "QOF Avg",
   "IT_Premises Avg",
-  "Contracted_Services Avg",
   "Global_Sum Avg"
 )
 
 ordered_levels_sum <- c(
   "COVID_19",
   "Prescribing",
-    "PCO_Payments",
-    "QOF",
+  "Directed_Enhanced_Services",
+  "Local_Incentive_Schemes",
+  "PCO_Payments",
+  "QOF",
   "IT_Premises",
-  "Contracted_Services",
   "Global_Sum"
 )
 
@@ -716,7 +729,23 @@ Total_Finance_Categories <- Total_Finance_Categories %>%
   group_by(`Payment Category`) %>%
   mutate(total_cat = sum(`Total (£)`, na.rm = TRUE)) %>%
   ungroup() %>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_sum))
+  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_sum)) %>%
+  group_by(IMD_QUINTILE) %>%
+  mutate(
+    group_total = sum(`Total (£)`),
+    pct = `Total (£)` / group_total,
+    label_text = paste0(
+  scales::percent(pct, accuracy = 1),
+  " (",
+  scales::label_number(
+    accuracy = 0.1,          
+    scale = 1e-6,            
+    suffix = "m"
+  )(`Total (£)`),
+  ")"
+)
+  ) %>%
+  ungroup()
 
 Barchart_Total_Payments_By_Categories <- ggplot(Total_Finance_Categories, aes(
   x = as.factor(IMD_QUINTILE),
@@ -724,6 +753,12 @@ Barchart_Total_Payments_By_Categories <- ggplot(Total_Finance_Categories, aes(
   fill =  PayCat_base
 )) +
   geom_bar(stat = "identity") +
+  geom_text(
+    aes(label = label_text),
+    size = 2.5,
+    position = position_stack(vjust = 0.5),
+    hjust = 0.5
+  ) +
   scale_y_continuous(labels = scales::comma)+
   labs(
     title = "Total NHS Payments by IMD Quintile (2023)",
@@ -744,7 +779,17 @@ Registered_Patients_Finance_Categories <- Avg_Finance_Categories %>%
     grepl("\\(Registered\\)$", `Payment Category`),  
     !is.na(IMD_QUINTILE)
   ) %>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg))
+  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg)) %>%
+  group_by(IMD_QUINTILE) %>%
+  mutate(
+    group_total = sum(`Total (£)`),
+    pct = `Total (£)` / group_total,
+    label_text = paste0(
+      scales::percent(pct, accuracy = 1), 
+      " (", scales::comma(`Total (£)`, accuracy = 0.1), ")"
+    )
+  ) %>%
+  ungroup()
 
 Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance_Categories, aes(
   x = IMD_QUINTILE,
@@ -752,6 +797,12 @@ Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance
   fill =  PayCat_base
 )) +
   geom_bar(stat = "identity") +
+  geom_text(
+    aes(label = label_text),
+    size = 2.5,
+    position = position_stack(vjust = 0.5),
+    hjust = 0.5
+  ) +
   labs(
     title = "Average NHS Payments per Registered Patient by IMD Quintile (2023)",
     x = "IMD Quintile (1 = Most Deprived, 5 = Least Deprived)",
@@ -768,17 +819,36 @@ Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance
 Weighted_Patients_Finance_Categories <- Avg_Finance_Categories %>%
   filter(
     YEAR == 2023,
-    grepl("\\(Weighted\\)$", `Payment Category`),  
+    grepl("\\(Weighted\\)$", `Payment Category`),
     !is.na(IMD_QUINTILE)
-  )%>%
-  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg))
+  ) %>%
+  mutate(PayCat_base = factor(PayCat_base, levels = ordered_levels_avg)) %>%
+  group_by(IMD_QUINTILE) %>%
+  mutate(
+    group_total = sum(`Total (£)`),
+    pct = `Total (£)` / group_total,
+    label_text = paste0(
+      scales::percent(pct, accuracy = 1), 
+      " (", scales::comma(`Total (£)`, accuracy = 0.1), ")"
+    )
+  ) %>%
+  ungroup()
 
-Barchart_Weighted_Patients_By_Categories <- ggplot(Weighted_Patients_Finance_Categories, aes(
-  x = as.factor(IMD_QUINTILE),
-  y = `Total (£)`,
-  fill =  PayCat_base
-)) +
+Barchart_Weighted_Patients_By_Categories <- ggplot(
+  Weighted_Patients_Finance_Categories,
+  aes(
+    x = as.factor(IMD_QUINTILE),
+    y = `Total (£)`,
+    fill = PayCat_base
+  )
+) +
   geom_bar(stat = "identity") +
+  geom_text(
+    aes(label = label_text),
+    size = 2.5,
+    position = position_stack(vjust = 0.5),
+    hjust = 0.5
+  ) +
   labs(
     title = "Average NHS Payments per Weighted Patient by IMD Quintile (2023)",
     x = "IMD Quintile (1 = Most Deprived, 5 = Least Deprived)",
