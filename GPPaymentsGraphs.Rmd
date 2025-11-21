@@ -755,7 +755,7 @@ Barchart_Total_Payments_By_Categories <- ggplot(Total_Finance_Categories, aes(
   geom_bar(stat = "identity") +
   geom_text(
     aes(label = label_text),
-    size = 2.5,
+    size = 1.7,
     position = position_stack(vjust = 0.5),
     hjust = 0.5
   ) +
@@ -799,7 +799,7 @@ Barchart_Registered_Patients_By_Categories <- ggplot(Registered_Patients_Finance
   geom_bar(stat = "identity") +
   geom_text(
     aes(label = label_text),
-    size = 2.5,
+    size = 1.7,
     position = position_stack(vjust = 0.5),
     hjust = 0.5
   ) +
@@ -845,7 +845,7 @@ Barchart_Weighted_Patients_By_Categories <- ggplot(
   geom_bar(stat = "identity") +
   geom_text(
     aes(label = label_text),
-    size = 2.5,
+    size = 1.7,
     position = position_stack(vjust = 0.5),
     hjust = 0.5
   ) +
